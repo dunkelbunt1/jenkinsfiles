@@ -1,0 +1,114 @@
+pipeline {
+  agent {
+    label 'any'
+}
+
+options {
+    disableConcurrentBuilds()
+ }
+
+parameters {
+    choice(choices: 'dev\nqa\nstage\nprod', description: '', name: 'ENV')
+    choice(choices: 'dev\nqa\nstage\nprod', description: '', name: 'YARN_ENV')
+ }
+
+tools {
+    nodejs 'version_changeme'
+}
+
+environment {
+    project_name = "changeme"
+    deploy_user  = "changeme"
+    dev_host     = "dev.example.com"
+    qa_host      = "qa.example.com"
+    stage_host   = "stage.example.com"
+    prod_host    = "prod.example.com"
+    dest_dir     = "changeme"
+    artifact     = "${WORKSPACE}/${project_name}.zip"
+}
+
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    dir('changeme') {
+                        sh """
+                        yarn install
+                        yarn run ${YARN_ENV}:build"""
+                    }
+                }
+            }
+        }
+        stage('Deploy Dev'){
+            when {
+              expression { params.ENV == 'dev' }
+            }
+            steps {
+                script {
+                          zip dir: 'changeme', glob: '', zipFile: '${project_name}.zip'
+                          sshagent(['user']) {
+                            sh "ssh ${dev_host} rm -rf ${dest_dir}/*"
+                            sh "scp ${artifact} ${deploy_user}@${dev_host}:${dest_dir}"
+                            sh "ssh ${dev_host} unzip -o ${dest_dir}/${project_name}.zip -d ${dest_dir}/"
+                            sh "ssh ${dev_host} rm ${dest_dir}/${project_name}.zip"
+                    }
+                }
+            }
+        }
+        stage('Deploy QA'){
+            when {
+              expression { params.ENV == 'qa' }
+            }
+            steps {
+                script {
+                          zip dir: 'changeme', glob: '', zipFile: '${project_name}.zip'
+                          sshagent(['user']) {
+                            sh "ssh ${qa_host} rm -rf ${dest_dir}/*"
+                            sh "scp ${qa_host} ${deploy_user}@${qa_host}:${dest_dir}"
+                            sh "ssh ${qa_host} unzip -o ${dest_dir}/${project_name}.zip -d ${dest_dir}/"
+                            sh "ssh ${qa_host} rm ${dest_dir}/${project_name}.zip"
+                    }
+                }
+            }
+        }
+        stage('Deploy Stage'){
+            when {
+              expression { params.ENV == 'stage' }
+            }
+            steps {
+                script {
+                          zip dir: 'changeme', glob: '', zipFile: '${project_name}.zip'
+                          sshagent(['user']) {
+                            sh "ssh ${stage_host} rm -rf ${dest_dir}/*"
+                            sh "scp ${artifact} ${deploy_user}@${stage_host}:${dest_dir}"
+                            sh "ssh ${stage_host} unzip -o ${dest_dir}/${project_name}.zip -d ${dest_dir}/"
+                            sh "ssh ${stage_host} rm ${dest_dir}/${project_name}.zip"
+                    }
+                }
+            }
+        }
+        stage('Deploy Prod'){
+            when {
+              expression { params.ENV == 'prod' }
+            }
+            steps {
+                script {
+                          zip dir: 'changeme', glob: '', zipFile: '${project_name}.zip'
+                          sshagent(['user']) {
+                            sh "ssh ${prod_host} rm -rf ${dest_dir}/*"
+                            sh "scp ${artifact} ${deploy_user}@${prod_host}:${dest_dir}"
+                            sh "ssh ${prod_host} unzip -o ${dest_dir}/${project_name}.zip -d ${dest_dir}/"
+                            sh "ssh ${prod_host} rm ${dest_dir}/${project_name}.zip"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+      always {
+          echo 'Jenkins was release the change to ${SERVER} environment. Please check.'
+          cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
+      }
+    }
+}
