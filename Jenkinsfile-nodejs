@@ -106,14 +106,13 @@ environment {
     }
 
     post {
-      always {
+        always {
           echo 'Jenkins was release the change to ${SERVER} environment. Please check.'
-          cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
-            if (${SERVER} == qa) {
-              slackSend baseUrl: 'SLACKURL', channel: 'CHANNEL', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) ", token: 'TOCKEN'
-            }
+            cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
+              if (${SERVER} == qa) {
+                slackSend baseUrl: 'SLACKURL', channel: 'CHANNEL', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) ", token: 'TOCKEN'
+              }
+          }
         }
-
-      }
     }
 }
