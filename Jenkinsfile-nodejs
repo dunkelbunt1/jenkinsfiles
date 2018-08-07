@@ -39,6 +39,12 @@ environment {
                 }
             }
         }
+        stage('Test') {
+            steps {
+                echo 'Testing, Node...'
+                sh 'npm test'
+            }
+        }
         stage('Deploy Dev'){
             when {
               expression { params.ENV == 'dev' }
@@ -104,15 +110,13 @@ environment {
             }
         }
     }
-
     post {
         always {
           echo 'Jenkins was release the change to ${SERVER} environment. Please check.'
             cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
-              if (${SERVER} == qa) {
+                if (${SERVER} == qa) {
                 slackSend baseUrl: 'SLACKURL', channel: 'CHANNEL', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) ", token: 'TOCKEN'
-              }
-          }
+                }
         }
     }
 }
