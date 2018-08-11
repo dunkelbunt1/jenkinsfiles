@@ -39,6 +39,12 @@ environment {
                 }
             }
         }
+        stage('Test') {
+            steps {
+                echo 'Testing, Node...'
+                sh 'npm test'
+            }
+        }
         stage('Deploy Dev'){
             when {
               expression { params.ENV == 'dev' }
