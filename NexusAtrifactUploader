@@ -1,0 +1,21 @@
+   stage('Nexus upload') {
+      when {
+        anyOf {
+          branch 'dev'; branch 'qa'; branch 'master'
+        } // end anyOf
+      } // end when
+      post {
+        always {
+          sendNotifications ('true', currentBuild.result, 'JENKINSAGENT')
+        } // end success
+      } // end post
+      steps {
+        script{
+          sh "ls -1 ${folder} > listItems"
+          list = readFile("listItems")
+          
+          list.trim().split('\n').each { item ->
+              nexusArtifactUploader artifacts: [[artifactId: "${item}", classifier: '', file: "${folder}/${item}", type: '']], credentialsId: 'USERNAME', groupId: "${nexusgroupID}/${item.replaceAll("EXAMPLE","EXAMPLE")}", nexusUrl: 'nexus.com', nexusVersion: 'VERSION', protocol: 'https', repository: '${REPOSITORY}', version: "${NEXUS_VERSION}"
+          }
+        }
+}
