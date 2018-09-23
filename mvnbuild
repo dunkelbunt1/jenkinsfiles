@@ -1,0 +1,60 @@
+pipeline {
+    agent {
+    label 'any'
+    }
+    tools {
+        maven ''
+        jdk ''
+    }
+    options {
+    disableConcurrentBuilds()
+    }
+
+    
+  environment {
+
+    empty = "dummy"
+    versionNumber = "1.0.0"
+   
+
+  }
+
+  
+  stages {
+
+    stage ('Initialize') {
+            steps {
+                sh '''
+                    echo "PATH = ${PATH}"
+                    echo "M2_HOME = ${M2_HOME}"
+                '''
+            }
+        }
+        stage ('Build') {
+            steps {
+                echo "building $versionNumber"
+                configFileProvider(
+                [configFile(fileId: 'XXXXX', variable: 'MAVEN_SETTINGS')]) {
+                sh 'mvn -s $MAVEN_SETTINGS clean deploy -U'
+                }
+
+            }
+        }
+    
+    stage('Archive') {
+        steps {
+        echo 'upload atrifact to nexus'
+        //if it is not inluded in pom.xml
+        nexusArtifactUploader artifacts: [[artifactId: '', classifier: '', file: '"{versionNumber}.war"', type: 'war']], credentialsId: '', groupId: '', nexusUrl: '', nexusVersion: '', protocol: '', repository: '', version: '"${versionNumber}"'
+        }
+    
+    }
+  }
+ post {
+    always {
+      /* Clean workspace if success */
+      cleanWs()
+            slackSend baseUrl: '', channel: '', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) to NEXUX/JFrog", token: ''
+    } // end always
+ } // end post
+} // end pipeline
