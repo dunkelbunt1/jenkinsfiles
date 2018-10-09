@@ -7,7 +7,7 @@
       post {
         always {
           sendNotifications ('true', currentBuild.result, 'JENKINSAGENT')
-        } // end success
+        } // end always
       } // end post
       steps {
         script{
