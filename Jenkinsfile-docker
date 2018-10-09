@@ -1,0 +1,54 @@
+pipeline {
+    environment {
+      DOCKER_AGENT="changeme"
+      CONTAINER_NAME="changeme"
+      CONTAINER_TAG="$BUILD_ID"
+      CONTAINER_PORTS="changeme:changeme"
+      DOCKER_REGISTRY="changeme"
+      DOCKER_PROJECT="changeme"
+      DOCKER_PROJECT_HOST="changeme"
+      DOCKER_API_PORT="changeme"
+    }
+    agent {
+      label 'changeme'
+    }
+    options {
+      disableConcurrentBuilds()
+    }
+    stages {
+        stage('Docker Build') {
+           steps {
+            sh 'docker build -t ${CONTAINER_NAME}:${CONTAINER_TAG} .'
+           }
+        }
+        stage('Docker Test') {
+           steps {
+            sh 'docker run -i --rm=true ${CONTAINER_NAME}:${CONTAINER_TAG} echo "Okay :)"'
+           }
+        }
+        stage('Docker Push') {
+          steps {
+            sh 'docker tag ${CONTAINER_NAME}:${CONTAINER_TAG} ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+            sh 'docker push ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+            sh 'docker rmi ${CONTAINER_NAME}:${CONTAINER_TAG}'
+           }
+        }
+        stage('Run App') {
+           steps {
+            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} pull ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
+            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} stop ${CONTAINER_NAME} || true'
+            sh 'sleep 10'
+            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+           }
+        }
+      }
+
+ post {
+    always {
+    echo "You can define post steps here."
+    //slackSend baseUrl: 'https://workspace.slack.com/services/hooks/jenkins-ci/', channel: 'im-qa', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)", token: 'V3V39q9WMXvYQoUuENTHNwPX'
+      /* Clean workspace if success */
+      //cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
+   } // end always
+  } // end post
+}// end pipeline
