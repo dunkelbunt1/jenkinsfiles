@@ -1,0 +1,88 @@
+
+pipeline {
+    agent {
+    label 'any'
+    }
+    tools {
+        maven ''
+        jdk ''
+    }
+    options {
+    disableConcurrentBuilds()
+    }
+    parameters{
+        choice(choices: '.dev\n.qa\prod\nnone', description: 'This is going to be the server you will deploy to . None will not ship the atrifact', name: 'SERVER')
+    }
+  environment {
+    DEPLOY_PRODUCT_NAME = ""
+    DEPLOY_BUILD_NUMBER = "${BUILD_NUMBER}"
+    side_user = "user"
+    stage_server = "company${SERVER}.exapmle.com"
+
+  }
+
+  
+  stages {
+
+    stage ('Initialize') {
+            steps {
+                sh '''
+                    echo "PATH = ${PATH}"
+                    echo "M2_HOME = ${M2_HOME}"
+                '''
+            }
+        }
+        
+        stage ('Build Maven') {
+            steps {
+                echo "building"
+                configFileProvider(
+                [configFile(fileId: 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', variable: 'MAVEN_SETTINGS')]) {
+                sh 'mvn -s $MAVEN_SETTINGS clean install -U'
+                }
+           }
+        }
+        stage ('Trigger Tenant Builds'){
+                when {
+                expression {params.SERVER != 'none'}
+                }
+                steps {
+                script{
+                    if (env.BRANCH_NAME == 'develop') {
+                        build 'Project/project/group/branch'
+                        build 'Project/project/group/branch'
+                    }
+                    else if (env.BRANCH_NAME == 'master') {
+                        build 'Project/project/group/branch'
+                        build 'Project/project/group/branch'
+                    }
+                }
+            }
+        }
+        stage('Upload Artifact') {
+            steps {
+               
+                nexusArtifactUploader artifacts: [[artifactId: '', classifier: '', file: "", type: '']], credentialsId: '', groupId: '', nexusUrl: '', nexusVersion: '', protocol: '', repository: '', version: "${VERSION}"
+            }
+        }
+        stage('Shipping artifact') {
+            when {
+                expression {params.SERVER != 'none'}
+            }
+            steps {
+                script {
+                    sshagent(['SSHAGENT']) {
+                        sh "ssh ${stage_server} run/deploy.sh"
+                    }
+                }
+
+            }
+        }
+  }//end stages
+
+ post {
+    always {
+    slackSend baseUrl: 'https://example/services/hooks/jenkins-ci/', channel: '', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>) to REPO", token: ''
+   } // end always
+  } // end post
+}// end pipeline
