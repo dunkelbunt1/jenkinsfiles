@@ -1,21 +1,22 @@
 pipeline {
     environment {
-      DOCKER_AGENT="changeme"
       CONTAINER_NAME="changeme"
-      CONTAINER_TAG="$BUILD_ID"
-      CONTAINER_PORTS="changeme:changeme"
-      DOCKER_REGISTRY="changeme"
-      DOCKER_PROJECT="changeme"
+      CONTAINER_TAG="$env.BRANCH_NAME-$BUILD_ID"
+      CONTAINER_PORTS="changeme"
+      DOCKER_HARBOR_REGISTRY="changeme"
+      DOCKER_HARBOR_PROJECT="changeme"
       DOCKER_PROJECT_HOST="changeme"
-      DOCKER_API_PORT="changeme"
+      DOCKER_PROJECT_HOST_QA="changeme"
+      DOCKER_PROJECT_HOST_QA_EXT="changeme"
+      DOCKER_PROJECT_PORT="changeme"
     }
     agent {
-      label 'changeme'
+      label 'dbdocker'
     }
     options {
       disableConcurrentBuilds()
     }
-    stages {
+  stages {
         stage('Docker Build') {
            steps {
             sh 'docker build -t ${CONTAINER_NAME}:${CONTAINER_TAG} .'
@@ -28,27 +29,44 @@ pipeline {
         }
         stage('Docker Push') {
           steps {
-            sh 'docker tag ${CONTAINER_NAME}:${CONTAINER_TAG} ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
-            sh 'docker push ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+            sh 'docker tag ${CONTAINER_NAME}:${CONTAINER_TAG} ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+            sh 'docker push ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
             sh 'docker rmi ${CONTAINER_NAME}:${CONTAINER_TAG}'
            }
         }
-        stage('Run App') {
-           steps {
-            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} pull ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
-            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} stop ${CONTAINER_NAME} || true'
-            sh 'sleep 10'
-            sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_API_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_REGISTRY}/${DOCKER_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
-           }
+        stage('Docker Run') {
+            steps {
+                script {
+                    if (env.BRANCH_NAME == 'qa')  {
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA}:${DOCKER_PROJECT_PORT} pull ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA}:${DOCKER_PROJECT_PORT} stop ${CONTAINER_NAME} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA}:${DOCKER_PROJECT_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+                    }
+                    else if (env.BRANCH_NAME == 'develop') {
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} pull ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} stop ${CONTAINER_NAME} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+                    }
+                    else if (env.BRANCH_NAME == 'ext') {
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA_EXT}:${DOCKER_PROJECT_PORT} pull ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA_EXT}:${DOCKER_PROJECT_PORT} stop ${CONTAINER_NAME} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST_QA_EXT}:${DOCKER_PROJECT_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+                    }
+                    else {
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} pull ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} stop ${CONTAINER_NAME} || true'
+                        sh 'docker -H ${DOCKER_PROJECT_HOST}:${DOCKER_PROJECT_PORT} run -d --rm --name ${CONTAINER_NAME} -p ${CONTAINER_PORTS} ${DOCKER_HARBOR_REGISTRY}/${DOCKER_HARBOR_PROJECT}/${CONTAINER_NAME}:${CONTAINER_TAG}'
+                    }
+                }
+            }
         }
-      }
+    }
 
  post {
     always {
-    echo "You can define post steps here."
-    //slackSend baseUrl: 'https://workspace.slack.com/services/hooks/jenkins-ci/', channel: 'im-qa', message: "Deployed: ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)", token: 'V3V39q9WMXvYQoUuENTHNwPX'
+        echo "You can add slack notification here."
       /* Clean workspace if success */
-      //cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
+      cleanWs cleanWhenFailure: false, cleanWhenUnstable: false
    } // end always
   } // end post
 }// end pipeline
